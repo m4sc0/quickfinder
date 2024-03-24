@@ -4,17 +4,36 @@
         <meta charset="UTF-8">
         <title>QuickFinder</title>
         <link href="https://cdn.tailwindcss.com" rel="stylesheet">
+        <link
+            href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&family=Roboto:wght@400;500;700&display=swap"
+            rel="stylesheet">
+        <link rel="stylesheet" href="/style.css">
         <script type="text/javascript" src="/eel.js"></script>
         <script type="text/javascript">
         eel.expose(printToConsole);
-        function printToConsole(message) {
+        function printToConsole(message, isFile = false) {
             const log = document.getElementById('log');
-            log.innerHTML += message + '<br>';
+            if (isFile) {
+                const fileInfo = message.split(', ');
+                const fileEntryHtml = `<div class="file-entry"><span class="file-name">📂 ${fileInfo[0]}</span><span class="file-path">${fileInfo[1]}</span></div>`;
+                log.innerHTML += fileEntryHtml;
+            } else {
+                log.innerHTML = `<div>${message}</div>${log.innerHTML}`;
+            }
         }
+
+        function addFileToExplorer(file) {
+            const fileList = document.getElementById('file-list');
+            const row = fileList.insertRow();
+            row.insertCell().textContent = file.name;
+            row.insertCell().textContent = file.path;
+            row.insertCell().textContent = file.size; // Assuming size is formatted as a string
+            row.insertCell().textContent = file.last_modified; // Assuming date is formatted
+        }     
 
         eel.expose(updateIndex);
         function updateIndex() {
-            eel.update_index();  // Call the Python function
+            eel.update_index();
         }
         
         async function processFiles() {
@@ -24,9 +43,7 @@
             if (files.length > 0) {
                 printToConsole(`Found ${files.length} files matching '${pattern}':`);
                 files.forEach(file => {
-                    // Assuming 'file' has 'name' and 'path' properties
-                    let fileInfo = `Name: ${file.name}, Path: ${file.path}`;
-                    printToConsole(fileInfo);
+                    addFileToExplorer(file);
                 });
             }
         }
@@ -34,10 +51,31 @@
     </script>
     </head>
     <body>
-        <input type="text" id="path" placeholder="Enter directory path">
-        <input type="text" id="pattern" placeholder="Enter search pattern">
-        <button onclick="processFiles()">Process Files</button>
-        <button onclick="updateIndex()">Update Index</button>
-        <div id="log"></div>
+        <div class="header">
+            <input type="text" id="path" placeholder="Enter directory path">
+            <input type="text" id="pattern" placeholder="Enter search pattern">
+            <button onclick="processFiles()">Process Files</button>
+            <button onclick="updateIndex()">Update Index</button>
+        </div>
+        <div id="file-explorer" class="file-explorer">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Path</th>
+                        <th>Size</th>
+                        <th>Date Modified</th>
+                    </tr>
+                </thead>
+                <tbody id="file-list">
+                    <!-- File entries will be populated here -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Log Section -->
+        <div id="log" class="log">
+            <!-- Log messages will be populated here -->
+        </div>
     </body>
 </html>

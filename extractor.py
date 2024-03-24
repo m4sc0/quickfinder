@@ -11,7 +11,7 @@ def index_files(path, depth=1, maxDepth=10):
         for item in os.listdir(path):
             full_path = os.path.join(path, item)
             if os.path.isfile(full_path):
-                fileList.append({"name": item, "path": full_path})
+                fileList.append({"name": item, "path": full_path, "size": os.path.getsize(full_path), "last_modified": os.path.getmtime(full_path)})
             elif os.path.isdir(full_path):
                 fileList.extend(index_files(full_path, depth + 1, maxDepth))
     except Exception as e:
@@ -21,7 +21,7 @@ def index_files(path, depth=1, maxDepth=10):
 
 def save_files(files, path="./index.json", indexed_path=""):
     data = {
-        "indexed_path": indexed_path,  # Save the root path that was indexed
+        "indexed_path": indexed_path,
         "files": files
     }
     try:
@@ -39,7 +39,6 @@ def search_files(pattern, path="./index.json"):
         result = []
         with open(path, 'r') as file:
             data = json.load(file)
-            # Adjusted to search within the 'files' key
             result = [entry for entry in data.get('files', []) if pattern.lower() in entry['name'].lower()]
         
         return result
