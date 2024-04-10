@@ -1,62 +1,72 @@
 import eel
-from extractor import index_files, save_files, search_files
+from extractor import index_files, save_files, get_partitions
 import os
 import json
+import subprocess
+import platform
 
 eel.init('web')
 
+# Globaler Speicher für den Index
+loaded_index = {}
+
 @eel.expose
-def process_files(path, pattern):
+def load_index_into_memory():
+    global loaded_index
     index_file_path = "./data/index.json"
-
-    def needs_indexing(search_path):
-        try:
-            with open(index_file_path, 'r') as file:
-                data = json.load(file)
-                indexed_path = data.get("indexed_path", "")
-                return not search_path.startswith(indexed_path)
-        except (json.JSONDecodeError, FileNotFoundError):
-            return True
-
-    if needs_indexing(path):
-        eel.printToConsole("Index file is outdated or doesn't cover the path. Re-indexing...")
-        files = index_files(path, maxDepth=10)
-        eel.printToConsole(f"Indexed {len(files)} files.")
-        
-        save_success = save_files(files, index_file_path, path)
-        if save_success:
-            eel.printToConsole("Files indexed and saved successfully.")
-        else:
-            eel.printToConsole("Failed to save the index file. Exiting...")
-            return []
-
-    eel.printToConsole('Searching...')
-    matched_files = search_files(pattern, index_file_path)
-    if matched_files:
-        return matched_files
-    else:
-        eel.printToConsole("No files matched or an error occurred.")
-        return []
+    try:
+        with open(index_file_path, 'r') as file:
+            loaded_index = json.load(file)
+            print("Index successfully loaded into memory.")
+    except Exception as e:
+        print(f"Failed to load index into memory: {e}")
 
 @eel.expose
-def update_index():
+def search_files(pattern, use_index=True):
+    global loaded_index
+    files = []
+    if use_index:
+        try:
+            files = [f for f in loaded_index.get('files', []) if pattern.lower() in f['name'].lower()]
+            eel.printToConsole(f"Found {len(files)} files in index matching '{pattern}'.")
+        except Exception as e:
+            eel.printToConsole(f"Error searching index in memory: {e}")
+            files = []
+    else:
+        eel.printToConsole("Indexing and searching the entire filesystem. This may take a while...")
+        all_partitions = get_partitions()
+        files = index_files(search_pattern=pattern)
+        # Nach der direkten Suche den Index aktualisieren, sowohl im Speicher als auch auf der Festplatte
+        loaded_index = {'files': files}
+        index_file_path = "./data/index.json"
+        save_files(files, index_file_path)  # Optionally save the results for future
+    return files
+
+@eel.expose
+def update_index(callback = None):
+    global loaded_index
+    index_file_path = "./data/index.json"
+    partitions = get_partitions()
+    eel.printToConsole("Updating index for the entire filesystem. This may take a while...")
+    files = index_files()
+    loaded_index = {'files': files}  # Update den Index im Speicher
+    save_success = save_files(files, index_file_path, partitions)
+    if save_success:
+        eel.printToConsole("Index updated successfully.")
+    else:
+        eel.printToConsole("Failed to update the index.")
+    callback()
+
+@eel.expose
+def open_file_or_directory(path):
     try:
-        with open("./data/index.json", 'r') as file:
-            data = json.load(file)
-            indexed_path = data.get("indexed_path", "")
-            if indexed_path:
-                eel.printToConsole(f"Updating index for path: {indexed_path}")
-                files = index_files(indexed_path, maxDepth=10)
-                save_success = save_files(files, "./data/index.json", indexed_path)
-                if save_success:
-                    eel.printToConsole("Index updated successfully.")
-                else:
-                    eel.printToConsole("Failed to update the index.")
-            else:
-                eel.printToConsole("No indexed path found for updating.")
+        if platform.system() == "Windows":
+            os.startfile(path)
+        elif platform.system() == "Darwin":  # macOS
+            subprocess.run(["open", path], check=True)
+        else:  # Linux und andere Unix-ähnliche Systeme
+            subprocess.run(["xdg-open", path], check=True)
     except Exception as e:
-        eel.printToConsole(f"Error updating index: {e}")
-        
+        eel.printToConsole(f"Error opening file or directory: {e}")
 
-
-eel.start('index.html', size=(800, 600))
+eel.start('index.html', size=(900, 600), )
